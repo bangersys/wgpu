@@ -249,7 +249,8 @@ impl super::Device {
     /// Borrow the raw GL texture name for a texture on a native or Emscripten
     /// GLES backend, or `None` for non-texture variants.
     ///
-    /// Native counterpart of [`Self::webgl_texture_handle`]: on native the
+    /// Native counterpart of `Device::webgl_texture_handle` (which exists only
+    /// on `cfg(webgl)`): on native the
     /// glow key *is* the GL name, so this delegates straight to
     /// [`super::Texture::native_texture_handle`] with no context lock and no
     /// GL calls. The two accessors never overlap: that one exists only under

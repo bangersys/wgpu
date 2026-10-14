@@ -536,11 +536,12 @@ impl Device {
     /// (native/Emscripten), or `None` on other backends, for non-texture
     /// variants, or for textures not created on this device.
     ///
-    /// Native counterpart of [`Self::as_webgl_texture`]: where WebGL resolves
+    /// Native counterpart of `Device::as_webgl_texture` (which exists only on
+    /// `cfg(webgl)`): where WebGL resolves
     /// a glow key through this device's context, on native the glow key *is*
     /// the GL name, so this returns the name itself. `wgpu` does not depend on
     /// `glow`, so the return is the bare name: wrap it in `glow::Texture` (a
-    /// transparent `NonZeroU32` newtype) before passing it to GL calls.
+    /// `NonZeroU32` newtype) before passing it to glow calls, or use `.get()`
     ///
     /// The borrow contract is the table on
     /// `wgpu_hal::gles::Texture::native_texture_handle`: same device (enforced
