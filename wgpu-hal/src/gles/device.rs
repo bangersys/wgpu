@@ -246,6 +246,22 @@ impl super::Device {
         }
     }
 
+    /// Borrow the raw GL texture name for a texture on a native or Emscripten
+    /// GLES backend, or `None` for non-texture variants.
+    ///
+    /// Native counterpart of [`Self::webgl_texture_handle`]: on native the
+    /// glow key *is* the GL name, so this delegates straight to
+    /// [`super::Texture::native_texture_handle`] with no context lock and no
+    /// GL calls. The two accessors never overlap: that one exists only under
+    /// `cfg(webgl)`, this one only under `cfg(any(native, Emscripten))`.
+    ///
+    /// The borrow contract lives on [`super::Texture::native_texture_handle`];
+    /// cross-device rejection is enforced one layer up, at `wgpu::Device`.
+    #[cfg(any(native, Emscripten))]
+    pub fn native_texture_handle(&self, texture: &super::Texture) -> Option<glow::Texture> {
+        texture.native_texture_handle()
+    }
+
     /// # Safety
     ///
     /// - `name` must be a non-zero GL buffer name created respecting `desc`.
