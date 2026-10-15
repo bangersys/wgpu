@@ -43,10 +43,19 @@ impl ApplicationHandler for Probe {
                             a
                         }
                     })
-                    .expect("FAIL: no GL config")
+                    .unwrap_or_else(|| {
+                        println!("FAIL: no GL config");
+                        std::process::exit(6);
+                    })
             })
-            .expect("FAIL: display setup failed");
-        let window = window.expect("FAIL: WGL always returns a window");
+            .unwrap_or_else(|e| {
+                println!("FAIL: display setup failed: {e:?}");
+                std::process::exit(6);
+            });
+        let window = window.unwrap_or_else(|| {
+            println!("FAIL: WGL display setup returned no window");
+            std::process::exit(6);
+        });
         let raw_win = window.window_handle().ok().map(|h| h.as_raw());
         let gl_display = gl_config.display();
 
@@ -109,14 +118,15 @@ impl ApplicationHandler for Probe {
         let host_name = unsafe {
             let name = gl.create_texture().expect("FAIL: host gen_texture failed");
             gl.bind_texture(glow::TEXTURE_2D, Some(name));
-            gl.tex_storage_2d(glow::TEXTURE_2D, 1, glow::RGBA8, W, H);
-            gl.tex_sub_image_2d(
+            // tex_image_2d, not tex_storage_2d: immutable storage needs GL
+            // 4.2 / ARB_texture_storage, but the target box reports GL 4.0.
+            gl.tex_image_2d(
                 glow::TEXTURE_2D,
                 0,
-                0,
-                0,
+                glow::RGBA8 as i32,
                 W,
                 H,
+                0,
                 glow::RGBA,
                 glow::UNSIGNED_BYTE,
                 glow::PixelUnpackData::Slice(Some(&pattern)),
