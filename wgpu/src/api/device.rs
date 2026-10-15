@@ -532,6 +532,51 @@ impl Device {
         hal_device.webgl_texture_handle(&hal_texture)
     }
 
+    /// Borrow the raw GL texture name for a [`Texture`] on the GLES backend
+    /// (native/Emscripten), or `None` on other backends, for non-texture
+    /// variants, or for textures not created on this device.
+    ///
+    /// Native counterpart of `Device::as_webgl_texture` (which exists only on
+    /// `cfg(webgl)`): where WebGL resolves
+    /// a glow key through this device's context, on native the glow key *is*
+    /// the GL name, so this returns the name itself. `wgpu` does not depend on
+    /// `glow`, so the return is the bare name: wrap it in `glow::Texture` (a
+    /// `NonZeroU32` newtype) before passing it to glow calls, or use `.get()`
+    ///
+    /// The borrow contract is the table on
+    /// `wgpu_hal::gles::Texture::native_texture_handle`: same device (enforced
+    /// here — foreign textures return `None`), wgpu-alive, context-current at
+    /// each use, never-delete / no-use-after-destroy, and caller-reads-target.
+    /// This method mutates no tracker state.
+    #[cfg(all(not(webgl), gles))]
+    pub fn as_native_gl_texture(&self, texture: &Texture) -> Option<core::num::NonZeroU32> {
+        use hal::api::Gles;
+
+        // A GL name is only meaningful in the context that issued it: a
+        // foreign texture's name could alias an unrelated texture here, so
+        // reject textures that were not created on this device. Same check as
+        // `texture_belongs_to_device`, inlined: that helper is `cfg(webgl)`-
+        // gated and does not exist on the native builds this method serves.
+        let core_device = self.inner.as_core_opt()?;
+        let core_texture = texture.inner.as_core_opt()?;
+        {
+            use wgc::resource::ParentDevice as _;
+            if core_texture
+                .wgpu_texture
+                .same_device(&core_device.wgpu_device)
+                .is_err()
+            {
+                return None;
+            }
+        }
+
+        let hal_device = unsafe { self.as_hal::<Gles>() }?;
+        let hal_texture = unsafe { texture.as_hal::<Gles>() }?;
+        hal_device
+            .native_texture_handle(&hal_texture)
+            .map(|raw| raw.0)
+    }
+
     /// Returns the underlying `web_sys::WebGl2RenderingContext` if this `Device`
     /// is on the GLES backend (WebGL platform), otherwise `None`.
     ///

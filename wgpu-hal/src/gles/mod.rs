@@ -544,6 +544,37 @@ impl Texture {
         }
     }
 
+    /// Borrow the raw GL texture name for this texture, if it holds a plain
+    /// GL texture.
+    ///
+    /// WebGL-mirror borrow: returns the underlying name without taking
+    /// ownership, taking any lock, or issuing any GL calls. Works for both
+    /// normally-created textures and textures imported via `texture_from_raw`.
+    /// Returns `None` for renderbuffers, the default framebuffer, and
+    /// external framebuffers.
+    ///
+    /// Borrow contract:
+    ///
+    /// | Obligation | Enforcement |
+    /// |---|---|
+    /// | Use only with the device that created the texture | Runtime `None` for foreign textures via the belongs-gate at the `wgpu::Device` layer; this primitive performs no device check |
+    /// | Keep the wgpu texture (and its device) alive for the whole borrow | Caller contract: the return is a copied GL name, not an `Arc`; nothing keeps the texture alive |
+    /// | Keep a GL context current on the calling thread at each use of the name | Caller contract: this accessor issues no GL calls and takes no lock |
+    /// | Never delete the name while wgpu may use it; never use it after destroy | Caller contract; a present `drop_guard` marks the GL object as externally owned, so `destroy_texture` never deletes it (see the `drop_guard` field docs) |
+    /// | Interpret the name with the texture's actual target, format, and size | Caller contract: read them from wgpu's descriptors; never assume |
+    pub fn native_texture_handle(&self) -> Option<glow::Texture> {
+        // `as_native` panics on non-textures; a borrow accessor must return
+        // `None` there instead.
+        match self.inner {
+            TextureInner::Texture { raw, .. } => Some(raw),
+            TextureInner::Renderbuffer { .. } | TextureInner::DefaultRenderbuffer => None,
+            #[cfg(webgl)]
+            TextureInner::ExternalFramebuffer { .. } => None,
+            #[cfg(native)]
+            TextureInner::ExternalNativeFramebuffer { .. } => None,
+        }
+    }
+
     /// More information can be found in issues #1614 and #1574
     fn log_failing_target_heuristics(view_dimension: wgt::TextureViewDimension, target: u32) {
         let expected_target = Self::target_for_view_dimension(view_dimension);
