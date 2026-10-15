@@ -562,6 +562,11 @@ impl Texture {
     /// | Keep a GL context current on the calling thread at each use of the name | Caller contract: this accessor issues no GL calls and takes no lock |
     /// | Never delete the name while wgpu may use it; never use it after destroy | Caller contract; a present `drop_guard` marks the GL object as externally owned, so `destroy_texture` never deletes it (see the `drop_guard` field docs) |
     /// | Interpret the name with the texture's actual target, format, and size | Caller contract: read them from wgpu's descriptors; never assume |
+    ///
+    /// Only available where the name is a real GL name (`native` and
+    /// Emscripten). On WebGL the key is an opaque slotmap handle, so this
+    /// accessor is absent there by construction.
+    #[cfg(any(native, Emscripten))]
     pub fn native_texture_handle(&self) -> Option<glow::Texture> {
         // `as_native` panics on non-textures; a borrow accessor must return
         // `None` there instead.
