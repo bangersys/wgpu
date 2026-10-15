@@ -549,7 +549,8 @@ impl Texture {
     ///
     /// WebGL-mirror borrow: returns the underlying name without taking
     /// ownership, taking any lock, or issuing any GL calls. Works for both
-    /// normally-created textures and textures imported via `texture_from_raw`.
+    /// normally-created textures and textures imported via `texture_from_raw`
+    /// (not `texture_from_raw_renderbuffer`, which yields a renderbuffer).
     /// Returns `None` for renderbuffers, the default framebuffer, and
     /// external framebuffers.
     ///
