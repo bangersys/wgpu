@@ -55,3 +55,7 @@ wgpu/src/backend/webgpu/webgpu_sys/wasm_bindgen_clone_tmp
 
 # Pycache files
 **/__pycache__/
+
+# throwaway probe build output (never commit)
+probe-host/target/
+probe-handoff/target/
