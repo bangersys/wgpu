@@ -226,7 +226,100 @@ impl ApplicationHandler for Probe {
             gl.delete_texture(glow::NativeTexture(host_name));
         }
 
-        println!("PASS: host wrote, hal borrowed, host read back identical");
+        // Direction 2 (the Row-1 capability): texture created THROUGH
+        // wgpu-hal, consumed by the host through the borrowed name. Direction
+        // 1 only proved import; this proves wgpu-created textures are usable
+        // outside wgpu. This texture is wgpu-owned, so it dies through the
+        // hal device, not the host.
+        let hal_created = unsafe {
+            opened.device.create_texture(&wgpu_hal::TextureDescriptor {
+                label: Some("probe-hal-created"),
+                size: wgpu_types::Extent3d {
+                    width: W as u32,
+                    height: H as u32,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu_types::TextureDimension::D2,
+                format: wgpu_types::TextureFormat::Rgba8Unorm,
+                usage: wgpu_types::TextureUses::RESOURCE
+                    | wgpu_types::TextureUses::COPY_SRC
+                    | wgpu_types::TextureUses::COPY_DST,
+                memory_flags: wgpu_hal::MemoryFlags::empty(),
+                view_formats: vec![],
+            })
+        }
+        .expect("FAIL: hal texture creation failed");
+        let hal_name = opened
+            .device
+            .native_texture_handle(&hal_created)
+            .expect("FAIL: borrow of hal-created texture returned None")
+            .0;
+        println!("hal-created borrow: Some({hal_name})");
+        let mut pattern2 = vec![0u8; (W * H * 4) as usize];
+        for (i, b) in pattern2.iter_mut().enumerate() {
+            *b = (i.wrapping_mul(11).wrapping_add(7)) as u8;
+        }
+        let mut readback2 = vec![0u8; pattern2.len()];
+        unsafe {
+            gl.bind_texture(glow::TEXTURE_2D, Some(glow::NativeTexture(hal_name)));
+            gl.tex_sub_image_2d(
+                glow::TEXTURE_2D,
+                0,
+                0,
+                0,
+                W,
+                H,
+                glow::RGBA,
+                glow::UNSIGNED_BYTE,
+                glow::PixelUnpackData::Slice(Some(&pattern2)),
+            );
+            gl.finish();
+            gl.get_tex_image(
+                glow::TEXTURE_2D,
+                0,
+                glow::RGBA,
+                glow::UNSIGNED_BYTE,
+                glow::PixelPackData::Slice(Some(&mut readback2)),
+            );
+            gl.bind_texture(glow::TEXTURE_2D, None);
+        }
+        match readback2
+            .iter()
+            .zip(pattern2.iter())
+            .position(|(a, b)| a != b)
+        {
+            None => println!("direction-2 readback: {} bytes identical", readback2.len()),
+            Some(i) => {
+                println!(
+                    "FAIL: direction-2 mismatch at byte {i}: got {}, want {}",
+                    readback2[i], pattern2[i]
+                );
+                std::process::exit(8);
+            }
+        }
+        unsafe { opened.device.destroy_texture(hal_created) };
+        println!("hal-created texture destroyed by wgpu (owned direction)");
+
+        // Fence diagnostic (informational only, never fails the run): raw
+        // sync objects with exact statuses, no wgpu queue involved.
+        unsafe {
+            match gl.fence_sync(glow::SYNC_GPU_COMMANDS_COMPLETE, 0) {
+                Ok(fence) => {
+                    gl.flush();
+                    let status =
+                        gl.client_wait_sync(fence, glow::SYNC_FLUSH_COMMANDS_BIT, 2_000_000_000);
+                    let err = gl.get_error();
+                    println!("fence diagnostic: client_wait={status:#X}, gl_error={err:#X}");
+                    println!("  (911A=ALREADY_SIGNALED 911C=CONDITION_SATISFIED 911B=TIMEOUT_EXPIRED 911D=WAIT_FAILED 0=no error)");
+                    gl.delete_sync(fence);
+                }
+                Err(e) => println!("fence diagnostic: fence_sync unsupported: {e}"),
+            }
+        }
+
+        println!("PASS: both directions identical (import + hal-created), fence diagnostic above");
         event_loop.exit();
     }
 
