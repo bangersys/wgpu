@@ -1,0 +1,14 @@
+[package]
+name = "host-probe"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+wgpu-hal = { path = "../wgpu-hal", features = ["gles"] }
+wgpu-types = { path = "../wgpu-types" }
+glutin = { version = "0.32", default-features = false, features = ["wgl", "egl"] }
+glow = "0.18"
+raw-window-handle = "0.6"
+
+[workspace]
