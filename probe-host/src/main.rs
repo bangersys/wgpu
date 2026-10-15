@@ -69,7 +69,7 @@ fn main() {
             Err(_) => continue,
         }
     }
-    let (config, context, surface) = working.unwrap_or_else(|| {
+    let (_config, context, surface) = working.unwrap_or_else(|| {
         println!("FAIL: no usable GL config (tried {tried_configs} configs, {tried_surfaces} pbuffer surfaces)");
         std::process::exit(6);
     });
