@@ -37,42 +37,45 @@ fn main() {
         Display::new(raw_display, DisplayApiPreference::Wgl(None))
             .expect("FAIL: no GL display (no driver)")
     };
+    // OpenGL configs without a surface-type filter: filtering to PBUFFER up
+    // front leaves a single exotic config on picky WGL drivers. Try each
+    // config in turn and keep the first one that accepts BOTH context
+    // creation and pbuffer surface creation.
     let template = ConfigTemplateBuilder::new()
         .with_api(glutin::config::Api::OPENGL)
-        .with_surface_type(glutin::config::ConfigSurfaceTypes::PBUFFER)
         .build();
     let context_attributes = ContextAttributesBuilder::new()
         .with_context_api(ContextApi::OpenGl(Some(Version::new(3, 3))))
         .build(None);
-    // Try every matching config in turn: the first config in the iterator is
-    // not guaranteed to accept context creation on picky WGL drivers (Intel
-    // rejects some pixel formats with error 2000). Keep the working pair.
-    let mut tried = 0;
+    let surface_attributes = SurfaceAttributesBuilder::<PbufferSurface>::new()
+        .build(NonZeroU32::new(64).unwrap(), NonZeroU32::new(64).unwrap());
+    let mut tried_configs = 0;
+    let mut tried_surfaces = 0;
     let mut working = None;
     for config in
         unsafe { display.find_configs(template) }.expect("FAIL: GL config enumeration failed")
     {
-        tried += 1;
-        match unsafe { display.create_context(&config, &context_attributes) } {
-            Ok(context) => {
-                working = Some((config, context));
+        tried_configs += 1;
+        let context = match unsafe { display.create_context(&config, &context_attributes) } {
+            Ok(context) => context,
+            Err(_) => continue,
+        };
+        tried_surfaces += 1;
+        match unsafe { display.create_pbuffer_surface(&config, &surface_attributes) } {
+            Ok(surface) => {
+                working = Some((config, context, surface));
                 break;
             }
             Err(_) => continue,
         }
     }
-    let (config, context) = working.unwrap_or_else(|| {
-        println!("FAIL: no usable GL config after trying {tried} (all rejected context creation)");
+    let (config, context, surface) = working.unwrap_or_else(|| {
+        println!("FAIL: no usable GL config (tried {tried_configs} configs, {tried_surfaces} pbuffer surfaces)");
         std::process::exit(6);
     });
-    println!("gl config accepted after {tried} attempt(s)");
-    let surface_attributes = SurfaceAttributesBuilder::<PbufferSurface>::new()
-        .build(NonZeroU32::new(64).unwrap(), NonZeroU32::new(64).unwrap());
-    let surface = unsafe {
-        display
-            .create_pbuffer_surface(&config, &surface_attributes)
-            .expect("FAIL: pbuffer surface creation failed")
-    };
+    println!(
+        "gl config accepted (configs tried: {tried_configs}, surfaces tried: {tried_surfaces})"
+    );
     let context = context
         .make_current(&surface)
         .expect("FAIL: cannot make GL context current");
