@@ -541,7 +541,8 @@ impl Device {
     /// a glow key through this device's context, on native the glow key *is*
     /// the GL name, so this returns the name itself. `wgpu` does not depend on
     /// `glow`, so the return is the bare name: wrap it in `glow::Texture` (a
-    /// `NonZeroU32` newtype) before passing it to glow calls, or use `.get()`
+    /// `NonZeroU32` newtype) before passing it to glow calls, or call `.get()`
+    /// on it for the raw `u32`.
     ///
     /// The borrow contract is the table on
     /// `wgpu_hal::gles::Texture::native_texture_handle`: same device (enforced
