@@ -8,7 +8,10 @@ publish = false
 wgpu-hal = { path = "../wgpu-hal", features = ["gles"] }
 wgpu-types = { path = "../wgpu-types" }
 glutin = { version = "0.32", default-features = false, features = ["wgl", "egl"] }
+glutin-winit = { version = "0.5", default-features = false, features = ["wgl", "egl"] }
+winit = "0.30"
 glow = "0.18"
 raw-window-handle = "0.6"
+env_logger = "0.11"
 
 [workspace]
