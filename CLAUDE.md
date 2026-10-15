@@ -73,3 +73,13 @@ All changes are expected to pass CI. The commands below are useful local checks,
 ## Changelog
 
 We maintain a changelog in CHANGELOG.md. Changes should be noted in the changelog if they are user-visible (changes to documented public APIs, significant bug fixes, or new functionality). We generally do not consider changes to wgpu-core, wgpu-hal, wgpu-core-remote, or wgpu-core-remote-types worthy of changelogs, unless a `wgpu` user is expected to interface with them directly. Changelog descriptions should be concise. If you are not sure whether something should be in the CHANGELOG or you are not sure how to describe the change, ask the user for guidance.
+
+## Fork Probe Hygiene (never commit build output)
+
+Build output must never reach any branch, on any fork. Two commits of `target/` directories were pushed before this rule existed; both branches had to be rebuilt. Follow this exactly:
+
+- Never `git add` a directory. Name every file, or run `git status --short` first and add paths individually.
+- Before every commit and every push, run `git ls-files | grep -E '(^|/)target/'` — empty output or stop.
+- Before every push, read `git show --stat HEAD` and confirm zero build artifacts (`.o`, `.rlib`, `.exe`, `.pdb`, `target/`).
+- Throwaway probe crates live on throwaway branches only, each with its own `target/` line in `.gitignore`. Never on a feature branch.
+- A local pre-commit hook (`.git/hooks/pre-commit`, not committed, does not travel on clone) rejects `target/` paths as a second net. Reinstall it after every fresh clone.
